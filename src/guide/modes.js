@@ -53,6 +53,7 @@ export async function handleRawStream({ req, res, sid, session, messages }) {
     // If the client disconnects, undici throws AbortError; that's fine.
     console.error("guide raw error:", err);
   } finally {
+    if (!closed) res.write("\n");
     res.end();
   }
 

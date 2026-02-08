@@ -65,6 +65,8 @@ guideRouter.post("/", async (req, res) => {
     });
   }
 
+
+  res.setHeader("X-Session-Id", sid);
   // Stream mode (curl -N friendly)
   startSSE(res);
 
