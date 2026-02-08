@@ -37,7 +37,7 @@ guideRouter.post("/", async (req, res) => {
   { role: "system", content: "You are a helpful assistant. Be concise." },
   ...getMessages(session).map((m) => ({ role: m.role, content: m.content })),
   ];
-
+  //
   // Raw streaming mode (plain text, terminal-friendly)
   if (await handleRawStream({ req, res, sid, session, messages })) {
     return;
