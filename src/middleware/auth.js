@@ -8,14 +8,12 @@ export function requireApiKey(apiKey) {
   
 
   //acctual middleware helper
-  return funtion authMiddleware(req,res,next){
-    const provided = req.header("x-api-key"):
+  return function authMiddleware(req,res,next){
+    const provided = req.header("x-api-key");
     if(provided !== apiKey){
       return res.status(401).json({error:"Unauthorized"});
     }
     next();
   };
-
-
 
 }

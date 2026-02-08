@@ -2,7 +2,7 @@ import express from "express";
 import { startSSE, sendEvent, startHeartbeat } from "./sse.js";
 import { getOrCreateSession, pushMessage, getMessages } from "./sessions.js";
 import { streamLocalServerChat } from "./model_http.js";
-
+import { handleRawStream } from "./modes.js";
 
 export const guideRouter = express.Router();
 
@@ -16,6 +16,7 @@ export const guideRouter = express.Router();
 guideRouter.post("/", async (req, res) => {
   const accept = req.header("accept") || "";
   const wantsSSE = accept.includes("text/event-stream");
+
 
   const { message, sessionId } = req.body ?? {};
 
@@ -37,7 +38,10 @@ guideRouter.post("/", async (req, res) => {
   ...getMessages(session).map((m) => ({ role: m.role, content: m.content })),
   ];
 
-
+  // Raw streaming mode (plain text, terminal-friendly)
+  if (await handleRawStream({ req, res, sid, session, messages })) {
+    return;
+  }
 
 
   // Non-stream mode (simple + script-friendly)
@@ -68,7 +72,7 @@ guideRouter.post("/", async (req, res) => {
   let closed = false;
 
   const ac = new AbortController();
-  req.on("close", () => {
+  res.on("close", () => {
     closed = true;
     ac.abort();
   });
@@ -93,6 +97,7 @@ guideRouter.post("/", async (req, res) => {
     }
     
   } catch (err) {
+    console.error("guide error:", err);
     if (!closed) {
       sendEvent(res, "done", { ok: false, error: String(err?.message || err) });
     }
