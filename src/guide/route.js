@@ -1,7 +1,7 @@
 import express from "express";
 import { startSSE, sendEvent, startHeartbeat } from "./sse.js";
 import { getOrCreateSession, pushMessage, getMessages } from "./sessions.js";
-import { streamLocalModel } from "./model_process.js";
+import { streamLocalServerChat } from "./model_http.js";
 
 
 export const guideRouter = express.Router();
@@ -32,20 +32,10 @@ guideRouter.post("/", async (req, res) => {
   //save the user message into session 
   pushMessage(session, "user", message);
   
-  const history = getMessages(session);
-
-  const system = "You are a helpful assistant. Be concise.";
-  const prompt =
-    system +
-    "\n\n" +
-    history
-      .map((m) => {
-        if (m.role === "user") return `User: ${m.content}`;
-        if (m.role === "assistant") return `Assistant: ${m.content}`;
-        return `${m.role}: ${m.content}`;
-      })
-      .join("\n") +
-    "\nAssistant:";
+  const messages = [
+  { role: "system", content: "You are a helpful assistant. Be concise." },
+  ...getMessages(session).map((m) => ({ role: m.role, content: m.content })),
+  ];
 
 
 
@@ -59,7 +49,7 @@ guideRouter.post("/", async (req, res) => {
     
     let reply = "";
 
-    for await (const chunk of streamLocalModel({prompt, signal: ac.signal })){
+    for await (const chunk of streamLocalServerChat({ messages, signal: ac.signal })) {
       reply += chunk;
     }
 
@@ -91,7 +81,7 @@ guideRouter.post("/", async (req, res) => {
     
     let reply = "";
 
-    for await (const chunk of streamLocalModel({ prompt, signal:ac.signal })){
+    for await (const chunk of streamLocalServerChat({ messages, signal: ac.signal })) {
       if (closed) break;
       reply += chunk;
       sendEvent(res,"token",chunk);
