@@ -12,39 +12,39 @@ export const detailsRouter = express.Router();
 
 detailsRouter.get("/", (req,res) => {
 
-  const requestId = `details-${crypto-randomBytes(8).toString("hex")}`;
+  const requestId = `details-${crypto.randomBytes(8).toString("hex")}`;
 
 
-  logSessionEvent(rid, "connect", {
+  logSessionEvent(requestId, "connect", {
     ip:req.ip,
     path:req.originalUrl,
     headers: sanitizeHeaders(req.headers),
   });
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-          <details>
-            <service>PYCEON</service>
-            <endpoint>/details</endpoint>
+<details>
+  <service>PYCEON</service>
+  <endpoint>/details</endpoint>
 
-            <model>
-              <name>Qwen2.5-7B-Instruct</name>
-              <format>GGUF</format>
-              <quantization>Q4_K_M</quantization>
-              <servedBy>llama-server (llama.cpp)</servedBy>
-            </model>
+  <model>
+    <name>Qwen2.5-7B-Instruct</name>
+    <format>GGUF</format>
+    <quantization>Q4_K_M</quantization>
+    <servedBy>llama-server (llama.cpp)</servedBy>
+  </model>
 
-            <backend>
-              <baseUrl>http://127.0.0.1:8080</baseUrl>
-              <openAICompatible>true</openAICompatible>
-              <chatCompletionsPath>/v1/chat/completions</chatCompletionsPath>
-            </backend>
+  <backend>
+    <baseUrl>http://127.0.0.1:8080</baseUrl>
+    <openAICompatible>true</openAICompatible>
+    <chatCompletionsPath>/v1/chat/completions</chatCompletionsPath>
+  </backend>
 
-            <auth>
-              <header>x-api-key</header>
-              <required>true</required>
-            </auth>
-          </details>
-          `;
+  <auth>
+    <header>x-api-key</header>
+    <required>true</required>
+  </auth>
+</details>
+`;
   res.status(200);
   res.setHeader("Content-Type","application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
