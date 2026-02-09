@@ -34,12 +34,11 @@ guideRouter.post("/", async (req, res) => {
   const {sessionId: sid, session } = getOrCreateSession(sessionId);
 
   //logs -> startTime
-  logSessionEvent(sid, "session", {
-    createdAt: session.createdAt,
+  logSessionEvent(sid, "connect", {
+    ip: req.ip,
+    path: req.originalUrl,
+    headers: sanitizeHeaders(req.headers),
   });
-
-
-  //logs -> root/logs
   logSessionEvent(sid, "session", {
     createdAt: session.createdAt,
   });
