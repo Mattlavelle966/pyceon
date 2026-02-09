@@ -3,7 +3,7 @@ import { startSSE, sendEvent, startHeartbeat } from "./sse.js";
 import { getOrCreateSession, pushMessage, getMessages } from "./sessions.js";
 import { streamLocalServerChat } from "./model_http.js";
 import { handleRawStream } from "./modes.js";
-
+import { logSessionEvent, sanitizeHeaders } from "./../logger/logger.js";
 export const guideRouter = express.Router();
 
 /**
@@ -14,11 +14,13 @@ export const guideRouter = express.Router();
  * Else -> JSON response
  */
 guideRouter.post("/", async (req, res) => {
+
   const accept = req.header("accept") || "";
   const wantsSSE = accept.includes("text/event-stream");
 
 
   const { message, sessionId } = req.body ?? {};
+  
 
 
   if (typeof message !== "string" || message.trim().length === 0) {
@@ -27,9 +29,22 @@ guideRouter.post("/", async (req, res) => {
   if (sessionId != null && typeof sessionId !== "string") {
     return res.status(400).json({ error: "sessionId must be a string" });
   }
+
   //Load or create a session
   const {sessionId: sid, session } = getOrCreateSession(sessionId);
-  
+
+  //logs -> startTime
+  logSessionEvent(sid, "session", {
+    createdAt: session.createdAt,
+  });
+
+
+  //logs -> root/logs
+  logSessionEvent(sid, "session", {
+    createdAt: session.createdAt,
+  });
+
+
   //save the user message into session 
   pushMessage(session, "user", message);
   
@@ -37,6 +52,12 @@ guideRouter.post("/", async (req, res) => {
   { role: "system", content: "You are a helpful assistant. Be concise." },
   ...getMessages(session).map((m) => ({ role: m.role, content: m.content })),
   ];
+
+  logSessionEvent(sid, "prompt", {
+    // this is “everything the LLM is seeing”
+    messages,
+  });
+
 
   // Raw streaming mode (plain text, terminal-friendly)
   if (await handleRawStream({ req, res, sid, session, messages })) {
@@ -90,22 +111,38 @@ guideRouter.post("/", async (req, res) => {
     for await (const chunk of streamLocalServerChat({ messages, signal: ac.signal })) {
       if (closed) break;
       reply += chunk;
+
       sendEvent(res,"token",chunk);
+
+      //logs
+      logSessionEvent(sid, "token",{chunk});
     }
 
     if (!closed) {
+
       pushMessage(session, "assistant", reply);
+      
       sendEvent(res, "done", { ok: true });
+      
+      //logs
+      logSessionEvent(sid,"reply",{ reply });
+      logSessionEvent(sid,"done",{ok:true});
     }
     
   } catch (err) {
     console.error("guide error:", err);
     if (!closed) {
-      sendEvent(res, "done", { ok: false, error: String(err?.message || err) });
+      const sendEventOBJ = { ok: false, error: String(err?.message || err) };
+      sendEvent(res, "done",sendEventOBJ);
+      //logs
+      logSessionEvent(sid,"disconnect", sendEventOBJ);
     }
   } finally {
+
     stopHeartbeat();
     res.end();
+    //logs
+    logSessionEvent(sid,"end", {"event" : "session closed"});
   }
 });
 
