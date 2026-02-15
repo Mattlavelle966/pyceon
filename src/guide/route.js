@@ -4,6 +4,7 @@ import { getOrCreateSession, pushMessage, getMessages } from "./sessions.js";
 import { streamLocalServerChat } from "./model_http.js";
 import { handleRawStream } from "./modes.js";
 import { logSessionEvent, sanitizeHeaders } from "./../logger/logger.js";
+import {scrapeForPrompt} from "./scrape.js";
 export const guideRouter = express.Router();
 
 /**
@@ -19,7 +20,7 @@ guideRouter.post("/", async (req, res) => {
   const wantsSSE = accept.includes("text/event-stream");
 
 
-  const { message, sessionId } = req.body ?? {};
+  const { message, sessionId, scrape, scrapeMode } = req.body ?? {};
   
 
 
@@ -29,6 +30,11 @@ guideRouter.post("/", async (req, res) => {
   if (sessionId != null && typeof sessionId !== "string") {
     return res.status(400).json({ error: "sessionId must be a string" });
   }
+  if (scrape != null && typeof scrape !== "string"){ 
+    return res.status(400).json({ error: "scrape must be a string URL" });
+  }
+
+
 
   //Load or create a session
   const {sessionId: sid, session } = getOrCreateSession(sessionId);
@@ -52,11 +58,26 @@ guideRouter.post("/", async (req, res) => {
   ...getMessages(session).map((m) => ({ role: m.role, content: m.content })),
   ];
 
+  
+
+  if (scrape){
+
+    const ac = new AbortController();
+    req.on("close", () => ac.abort());
+
+
+    const scrapedText = await scrapeForPrompt(scrape,{ mode: scrapeMode, signal: ac.signal });
+    messages.splice(1,0,{
+      role:"system",
+      content: `[SCRAPED_CONTENT url="${scrape}"]\n${scrapedText}\n[/SCRAPED_CONTEXT]`
+    });
+    
+  }
+
   logSessionEvent(sid, "prompt", {
     // this is “everything the LLM is seeing”
     messages,
   });
-
 
   // Raw streaming mode (plain text, terminal-friendly)
   if (await handleRawStream({ req, res, sid, session, messages })) {
